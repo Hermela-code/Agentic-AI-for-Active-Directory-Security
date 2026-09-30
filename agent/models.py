@@ -21,8 +21,9 @@ class Finding(BaseModel):
     description: str
     evidence: Optional[str] = None
 
-investigation = Investigation(
-    id="test-001",
-    target="192.168.56.10"
-)
 
+class AnalysisResult(BaseModel):
+    summary: str
+    findings: list[Finding] = []
+    recommended_next_step: Optional[str] = None
+    
