@@ -42,3 +42,9 @@ class InvestigationState(BaseModel):
     # Findings and Decisions
     findings: list[Finding] = []
     decision_log: list[str] = []
+
+class AgentDecision(BaseModel):
+    capability: Optional[str] = None
+    params: dict = {}
+    rationale: str
+    investigation_complete: bool = False

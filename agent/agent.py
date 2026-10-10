@@ -1,6 +1,7 @@
 from typing import Optional
 from agent.analyzer import ADAnalyzer
 from agent.config import MODEL_NAME
+from agent.llm import OllamaReasoningEngine
 from agent.models import Finding, InvestigationState, ToolResult
 from tools.registry import ToolRegistry
 
@@ -10,6 +11,7 @@ class ADAgent:
         self.model_name = MODEL_NAME
         self.tools = ToolRegistry()
         self.analyzer = ADAnalyzer()
+        self.reasoning_engine = OllamaReasoningEngine(model_name=self.model_name)
 
     def run_capability(self, capability: str, target: str, **kwargs) -> ToolResult:
         """Executes an allowlisted security capability through the tool registry."""
@@ -25,48 +27,40 @@ class ADAgent:
 
     def decide_next_action(self, state: InvestigationState) -> Optional[dict]:
         """
-        Deterministic decision policy based on current investigation state.
-        Determines the next capability based on identified knowledge gaps.
+        Queries the LLM reasoning engine to dynamically decide the next action
+        based on accumulated state and allowlisted capabilities.
         """
-        # Step 1: If we haven't done initial network discovery, run it first
-        if "network_discovery" not in state.executed_capabilities:
-            return {
-                "capability": "network_discovery",
-                "params": {},
-                "rationale": "Initial reconnaissance required to identify exposed ports and services.",
-            }
+        allowed = list(self.tools.tools.keys())
+        decision = self.reasoning_engine.decide_action(state, allowed)
 
-        # Step 2: If network discovery revealed AD indicators but domain isn't fully profiled, run domain_enum
-        has_ad_indicator = any("Kerberos" in f.title or "LDAP" in f.title for f in state.findings)
-        if has_ad_indicator and "domain_enumeration" not in state.executed_capabilities:
-            return {
-                "capability": "domain_enumeration",
-                "params": {"operation": "users"},
-                "rationale": "Active Directory indicators observed. Querying directory services for domain hierarchy and policies.",
-            }
+        if decision.investigation_complete or not decision.capability:
+            return None
 
-        # Step 3: Stop when baseline reconnaissance is satisfied or credentials are required
-        return None
+        return {
+            "capability": decision.capability,
+            "params": decision.params,
+            "rationale": decision.rationale,
+        }
 
     def investigate(self, target: str) -> InvestigationState:
-        """Runs the autonomous Observe -> Analyze -> Decide -> Act loop."""
+        """Runs the autonomous Observe -> Analyze -> Decide -> Act loop using LLM reasoning."""
         state = InvestigationState(
             investigation_id="inv-goad-001",
             target=target,
             status="running",
         )
 
-        print(f"[*] Starting Autonomous Investigation against target: {target}")
-        print(f"[*] Active Reasoning Model Profile: {self.model_name}\n" + "=" * 60)
+        print(f"[*] Starting LLM-Guided Autonomous Investigation against: {target}")
+        print(f"[*] Active Reasoning Model: {self.model_name}\n" + "=" * 60)
 
         while state.status == "running" and state.current_step < state.max_steps:
             state.current_step += 1
-            print(f"\n--- [Cycle {state.current_step}] Observe & Decide ---")
+            print(f"\n--- [Cycle {state.current_step}] Observe & Decide (LLM) ---")
 
-            # 1. DECIDE
+            # 1. DECIDE via LLM
             decision = self.decide_next_action(state)
             if not decision:
-                print("[*] Investigation Complete: No further safe reconnaissance actions queued.")
+                print("[*] Investigation Complete: Model concluded no further actions required.")
                 state.status = "completed"
                 break
 
@@ -74,8 +68,8 @@ class ADAgent:
             params = decision["params"]
             rationale = decision["rationale"]
 
-            print(f"[>] Selected Capability: '{capability}'")
-            print(f"[>] Rationale: {rationale}")
+            print(f"[>] LLM Selected Capability: '{capability}'")
+            print(f"[>] LLM Rationale: {rationale}")
             state.decision_log.append(f"Step {state.current_step}: Ran {capability} - {rationale}")
 
             # 2. ACT
@@ -90,18 +84,16 @@ class ADAgent:
 
             # 4. UPDATE STATE
             for finding in analysis.findings:
-                # Deduplicate findings by title
                 if not any(existing.title == finding.title for existing in state.findings):
                     state.findings.append(finding)
                     print(f"    - Finding: [{finding.severity.upper()}] {finding.title}")
 
-                    # Extract entity metadata into state
                     if "Active Directory Domain Identified" in finding.title:
                         state.discovered_domain = finding.title.split(": ")[-1]
                     if "Domain Controller Hostname" in finding.title:
                         state.discovered_dc = finding.title.split(": ")[-1]
 
-            print(f"[>] Recommendation: {analysis.recommended_next_step}")
+            print(f"[>] Analyzer Recommendation: {analysis.recommended_next_step}")
 
         return state
 
