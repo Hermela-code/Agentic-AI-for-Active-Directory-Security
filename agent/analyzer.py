@@ -1,27 +1,27 @@
-from agent.models import ToolResult, AnalysisResult, Finding
+import re
+from typing import List, Optional
+from agent.models import AnalysisResult, Finding, ToolResult
 
 
 class ADAnalyzer:
-    """
-    Analyzes security tool results and extracts
-    useful Active Directory information.
-    """
+    """Analyzes security tool results and extracts structured Active Directory information."""
 
     def analyze(self, result: ToolResult) -> AnalysisResult:
-        output = result.output.lower()
+        if result.tool == "domain_enumeration":
+            return self._analyze_domain_enum(result)
+        return self._analyze_network_discovery(result)
 
-        findings = []
+    def _analyze_network_discovery(self, result: ToolResult) -> AnalysisResult:
+        output = result.output.lower()
+        findings: List[Finding] = []
 
         if "88/tcp" in output and "kerberos" in output:
             findings.append(
                 Finding(
                     title="Kerberos service detected",
                     severity="info",
-                    description=(
-                        "Kerberos is available on the target. "
-                        "This is commonly associated with an Active Directory domain."
-                    ),
-                    evidence="Port 88/tcp with Kerberos service detected."
+                    description="Kerberos is available on the target. Commonly associated with an Active Directory Domain Controller.",
+                    evidence="Port 88/tcp with Kerberos service detected.",
                 )
             )
 
@@ -30,11 +30,8 @@ class ADAnalyzer:
                 Finding(
                     title="LDAP service detected",
                     severity="info",
-                    description=(
-                        "LDAP is available on the target. "
-                        "The service appears to provide Active Directory directory services."
-                    ),
-                    evidence="Port 389/tcp with Microsoft Active Directory LDAP detected."
+                    description="LDAP is available on the target, providing directory services.",
+                    evidence="Port 389/tcp with Active Directory LDAP detected.",
                 )
             )
 
@@ -43,11 +40,8 @@ class ADAnalyzer:
                 Finding(
                     title="SMB service detected",
                     severity="info",
-                    description=(
-                        "SMB is available on the target. "
-                        "This can be investigated for Windows and Active Directory information."
-                    ),
-                    evidence="Port 445/tcp is open."
+                    description="SMB is available on the target.",
+                    evidence="Port 445/tcp is open.",
                 )
             )
 
@@ -56,56 +50,71 @@ class ADAnalyzer:
                 Finding(
                     title="Active Directory Global Catalog detected",
                     severity="info",
-                    description=(
-                        "The Global Catalog service was detected. "
-                        "This is strong evidence that the host is an Active Directory domain controller."
-                    ),
-                    evidence="Global Catalog detected on ports 3268/3269."
-                )
-            )
-
-        domain_detected = "domain:" in output
-        host_detected = "host:" in output
-
-        if domain_detected:
-            findings.append(
-                Finding(
-                    title="Active Directory domain identified",
-                    severity="info",
-                    description=(
-                        "The Nmap service information contains an Active Directory domain."
-                    ),
-                    evidence="Domain information detected in Nmap output."
-                )
-            )
-
-        if host_detected:
-            findings.append(
-                Finding(
-                    title="Windows host identified",
-                    severity="info",
-                    description=(
-                        "The target's Windows host name was identified."
-                    ),
-                    evidence="Host information detected in Nmap service information."
+                    description="Global Catalog detected, confirming domain controller role.",
+                    evidence="Global Catalog detected on ports 3268/3269.",
                 )
             )
 
         if not findings:
             summary = "No specific Active Directory indicators were identified."
-            next_step = "Perform additional reconnaissance."
+            next_step = "Perform additional host discovery."
         else:
-            summary = (
-                "The target shows multiple indicators of an "
-                "Active Directory environment."
-            )
-            next_step = (
-                "Enumerate the domain, users, groups, computers, "
-                "and available services."
-            )
+            summary = "The target shows multiple indicators of an Active Directory environment."
+            next_step = "Run domain_enumeration to gather directory details."
 
         return AnalysisResult(
             summary=summary,
             findings=findings,
-            recommended_next_step=next_step
+            recommended_next_step=next_step,
+        )
+
+    def _analyze_domain_enum(self, result: ToolResult) -> AnalysisResult:
+        findings: List[Finding] = []
+        output = result.output
+
+        # Extract domain name if present in banner
+        domain_match = re.search(r"\(domain:([^)]+)\)", output)
+        hostname_match = re.search(r"\(name:([^)]+)\)", output)
+
+        if domain_match:
+            domain_name = domain_match.group(1)
+            findings.append(
+                Finding(
+                    title=f"Active Directory Domain Identified: {domain_name}",
+                    severity="info",
+                    description=f"Verified Active Directory domain from LDAP service banner: {domain_name}.",
+                    evidence=domain_match.group(0),
+                )
+            )
+
+        if hostname_match:
+            hostname = hostname_match.group(1)
+            findings.append(
+                Finding(
+                    title=f"Domain Controller Hostname: {hostname}",
+                    severity="info",
+                    description=f"Identified Domain Controller host name: {hostname}.",
+                    evidence=hostname_match.group(0),
+                )
+            )
+
+        if result.status == "auth_required":
+            findings.append(
+                Finding(
+                    title="Anonymous LDAP Queries Restricted",
+                    severity="low",
+                    description="The Domain Controller enforces LDAP bind authentication. Unauthenticated object enumeration is prohibited by policy.",
+                    evidence="Error in searchRequest: successful bind must be completed.",
+                )
+            )
+            summary = "Domain metadata successfully acquired; directory queries require authentication."
+            next_step = "Acquire domain credentials or proceed with unauthenticated SMB/RPC inspection."
+        else:
+            summary = "Domain enumeration completed."
+            next_step = "Analyze directory objects and relationships."
+
+        return AnalysisResult(
+            summary=summary,
+            findings=findings,
+            recommended_next_step=next_step,
         )
