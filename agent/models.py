@@ -1,11 +1,17 @@
+from enum import Enum
+from typing import List, Optional
 from pydantic import BaseModel
-from typing import Optional
 
 
-class Investigation(BaseModel):
-    id: str
-    target: str
-    status: str = "pending"
+class CapabilityTier(str, Enum):
+    READ_ONLY = "read_only"
+    REQUIRES_APPROVAL = "requires_approval"
+
+
+class ApprovalStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
 
 
 class ToolResult(BaseModel):
@@ -24,9 +30,29 @@ class Finding(BaseModel):
 
 class AnalysisResult(BaseModel):
     summary: str
-    findings: list[Finding] = []
+    findings: List[Finding] = []
     recommended_next_step: Optional[str] = None
-    
+
+
+class AgentDecision(BaseModel):
+    capability: Optional[str] = None
+    params: dict = {}
+    rationale: str
+    investigation_complete: bool = False
+
+
+# Define ApprovalRequest BEFORE InvestigationState
+class ApprovalRequest(BaseModel):
+    id: str
+    investigation_id: str
+    capability: str
+    target: str
+    params: dict = {}
+    rationale: str
+    risk_assessment: str
+    status: ApprovalStatus = ApprovalStatus.PENDING
+
+
 class InvestigationState(BaseModel):
     investigation_id: str
     target: str
@@ -37,14 +63,9 @@ class InvestigationState(BaseModel):
     # Accumulated Environment Knowledge
     discovered_dc: Optional[str] = None
     discovered_domain: Optional[str] = None
-    executed_capabilities: list[str] = []
-    
-    # Findings and Decisions
-    findings: list[Finding] = []
-    decision_log: list[str] = []
+    executed_capabilities: List[str] = []
 
-class AgentDecision(BaseModel):
-    capability: Optional[str] = None
-    params: dict = {}
-    rationale: str
-    investigation_complete: bool = False
+    # Findings, Decisions, and Approvals
+    findings: List[Finding] = []
+    decision_log: List[str] = []
+    approval_records: List[ApprovalRequest] = []

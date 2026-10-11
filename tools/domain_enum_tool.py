@@ -1,3 +1,4 @@
+from agent.models import CapabilityTier
 import ipaddress
 import subprocess
 from typing import Dict, List, Optional
@@ -8,8 +9,12 @@ from tools.base import SecurityTool
 class DomainEnumerationTool(SecurityTool):
     name = "domain_enumeration"
 
+    tier = CapabilityTier.REQUIRES_APPROVAL
+    risk_description = "Active directory query generating network traffic and server event logs."
+
     # Authorized subnet boundaries (GOAD-Light default host-only network)
     AUTHORIZED_SCOPE = ipaddress.ip_network("192.168.56.0/24")
+
 
     # Safe enumeration flags
     ALLOWED_OPERATIONS: Dict[str, List[str]] = {
