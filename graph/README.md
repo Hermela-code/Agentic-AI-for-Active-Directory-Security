@@ -1,6 +1,5 @@
 # Knowledge Graph & Attack Paths
 
-Owner: **Lidiya Alemayehu**
 
 This folder is the Neo4j-backed knowledge graph for the Agentic AI for
 Active Directory Security project. It turns raw recon-tool output into
