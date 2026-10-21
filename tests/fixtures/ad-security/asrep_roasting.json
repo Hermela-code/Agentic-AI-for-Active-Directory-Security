@@ -1,0 +1,66 @@
+{
+  "scenario_id": "AD-02",
+  "description": "Sample evidence cases for AS-REP roasting analysis",
+  "cases": [
+    {
+      "case_id": "ASREP-001",
+      "description": "Pre-authentication disabled",
+      "collection_status": "success",
+      "evidence": {
+        "account_name": "svc_legacy",
+        "preauth_required": false
+      },
+      "expected_classification": "potential_exposure",
+      "expected_claims": [
+        "kerberos_preauthentication_disabled"
+      ],
+      "must_not_claim": [
+        "weak_password_confirmed",
+        "credential_recovered",
+        "account_compromised"
+      ]
+    },
+    {
+      "case_id": "ASREP-002",
+      "description": "Pre-authentication enabled",
+      "collection_status": "success",
+      "evidence": {
+        "account_name": "ordinary_user",
+        "preauth_required": true
+      },
+      "expected_classification": "no_matching_indicator",
+      "expected_claims": [],
+      "must_not_claim": [
+        "environment_is_secure"
+      ]
+    },
+    {
+      "case_id": "ASREP-003",
+      "description": "Pre-authentication configuration is unavailable",
+      "collection_status": "success",
+      "evidence": {
+        "account_name": "svc_unknown",
+        "preauth_required": null
+      },
+      "expected_classification": "inconclusive",
+      "expected_claims": [],
+      "must_not_claim": [
+        "preauthentication_enabled",
+        "preauthentication_disabled"
+      ]
+    },
+    {
+      "case_id": "ASREP-004",
+      "description": "Tool collection failed",
+      "collection_status": "failed",
+      "error": "Simulated directory query failure",
+      "evidence": null,
+      "expected_classification": "collection_error",
+      "expected_claims": [],
+      "must_not_claim": [
+        "no_matching_indicator",
+        "environment_is_secure"
+      ]
+    }
+  ]
+}

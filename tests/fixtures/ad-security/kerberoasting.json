@@ -1,0 +1,68 @@
+{
+  "scenario_id": "AD-01",
+  "description": "Sample evidence cases for Kerberoasting analysis",
+  "cases": [
+    {
+      "case_id": "KERB-001",
+      "description": "SPN-associated account observed",
+      "collection_status": "success",
+      "evidence": {
+        "account_name": "svc_app",
+        "spns": ["HTTP/app.example.test"],
+        "enabled": true
+      },
+      "expected_classification": "potential_exposure",
+      "expected_claims": [
+        "spn_associated_account_observed"
+      ],
+      "must_not_claim": [
+        "weak_password_confirmed",
+        "credential_recovered",
+        "account_compromised"
+      ]
+    },
+    {
+      "case_id": "KERB-002",
+      "description": "No SPN observed in a successful scoped query",
+      "collection_status": "success",
+      "evidence": {
+        "account_name": "ordinary_user",
+        "spns": [],
+        "enabled": true
+      },
+      "expected_classification": "no_matching_indicator",
+      "expected_claims": [],
+      "must_not_claim": [
+        "environment_is_secure"
+      ]
+    },
+    {
+      "case_id": "KERB-003",
+      "description": "Required account data is incomplete",
+      "collection_status": "success",
+      "evidence": {
+        "account_name": "svc_unknown",
+        "spns": null
+      },
+      "expected_classification": "inconclusive",
+      "expected_claims": [],
+      "must_not_claim": [
+        "no_spn_exists",
+        "vulnerability_confirmed"
+      ]
+    },
+    {
+      "case_id": "KERB-004",
+      "description": "Tool collection failed",
+      "collection_status": "failed",
+      "error": "Simulated directory query failure",
+      "evidence": null,
+      "expected_classification": "collection_error",
+      "expected_claims": [],
+      "must_not_claim": [
+        "no_matching_indicator",
+        "environment_is_secure"
+      ]
+    }
+  ]
+}
