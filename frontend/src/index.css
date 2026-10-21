@@ -1,0 +1,251 @@
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --border: #2a2f3a;
+  --text: #e6e8eb;
+  --text-dim: #9aa1ab;
+  --accent: #4f8cff;
+  --danger: #ff5c5c;
+  --success: #3ecf8e;
+  --warning: #f5b94d;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app-shell {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+header h1 {
+  font-size: 1.4rem;
+  margin-bottom: 0.1rem;
+}
+
+.subtitle {
+  color: var(--text-dim);
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+}
+
+.target-input {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.target-input label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin-bottom: 0.4rem;
+}
+
+.target-input-row {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.target-input input {
+  flex: 1;
+  padding: 0.6rem 0.75rem;
+  background: #0d0f13;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.target-input button {
+  padding: 0.6rem 1.1rem;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.target-input button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.input-error {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0;
+}
+
+.error-banner {
+  background: rgba(255, 92, 92, 0.12);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.25rem;
+  font-size: 0.9rem;
+}
+
+.status-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.status-running { background: rgba(245, 185, 77, 0.15); color: var(--warning); }
+.status-completed { background: rgba(62, 207, 142, 0.15); color: var(--success); }
+.status-awaiting_approval { background: rgba(255, 92, 92, 0.15); color: var(--danger); }
+.status-failed { background: rgba(255, 92, 92, 0.2); color: var(--danger); }
+
+.status-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0;
+}
+
+.status-grid dt { color: var(--text-dim); font-size: 0.85rem; }
+.status-grid dd { margin: 0; font-size: 0.9rem; }
+
+.dashboard-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+@media (max-width: 700px) {
+  .dashboard-columns { grid-template-columns: 1fr; }
+}
+
+.activity-log, .findings-list {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.activity-log h2, .findings-list h2, .approval-panel h2 {
+  font-size: 1rem;
+  margin-top: 0;
+}
+
+.empty-state {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.activity-log ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.activity-entry {
+  font-size: 0.85rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.activity-entry:last-child { border-bottom: none; }
+
+.activity-entry-header {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.activity-status { font-size: 0.75rem; text-transform: uppercase; color: var(--text-dim); }
+.activity-summary { color: var(--text-dim); font-size: 0.8rem; margin: 0.2rem 0; }
+.activity-time { color: var(--text-dim); font-size: 0.7rem; }
+
+.finding-card {
+  border-left: 3px solid var(--text-dim);
+  background: #0d0f13;
+  border-radius: 6px;
+  padding: 0.65rem 0.8rem;
+  margin-bottom: 0.6rem;
+}
+
+.finding-card.severity-critical,
+.finding-card.severity-high { border-left-color: var(--danger); }
+.finding-card.severity-medium { border-left-color: var(--warning); }
+.finding-card.severity-low,
+.finding-card.severity-info { border-left-color: var(--accent); }
+
+.finding-header {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  margin-bottom: 0.3rem;
+}
+
+.finding-severity {
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.finding-title { font-weight: 600; font-size: 0.9rem; }
+.finding-description { font-size: 0.85rem; margin: 0.2rem 0; color: var(--text-dim); }
+.finding-evidence { font-size: 0.8rem; margin: 0.2rem 0 0; color: var(--text-dim); }
+
+.approval-panel {
+  background: rgba(245, 185, 77, 0.08);
+  border: 1px solid var(--warning);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.approval-card {
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 0.8rem;
+  margin-bottom: 0.6rem;
+}
+
+.approval-card dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.3rem 1rem;
+  margin: 0 0 0.75rem;
+}
+
+.approval-card dt { color: var(--text-dim); font-size: 0.8rem; }
+.approval-card dd { margin: 0; font-size: 0.85rem; }
+
+.approval-actions { display: flex; gap: 0.6rem; }
+
+.approve-btn, .reject-btn {
+  padding: 0.45rem 0.9rem;
+  border-radius: 6px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.approve-btn { background: var(--success); color: #063; }
+.reject-btn { background: var(--danger); color: #400; }
