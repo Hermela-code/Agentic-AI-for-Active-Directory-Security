@@ -1,0 +1,7 @@
+start_frontend.sh
+start_backend.sh
+__pycache__/
+*.pyc
+node_modules/
+.env
+agent_tiger.db
