@@ -54,6 +54,7 @@ class InvestigationService:
         return inv
 
     @staticmethod
+    @staticmethod
     def _run_agent_worker(inv_id: str, target: str):
         """Worker loop executing the agent and persisting state/findings to the database."""
         db: Session = SessionLocal()
@@ -78,15 +79,17 @@ class InvestigationService:
 
                 # 1. LLM Decision
                 decision = agent.decide_next_action(state)
-                if not decision:
+                
+                # STOP if LLM has no decision OR tries to repeat an already executed capability
+                if not decision or decision.get("capability") in state.executed_capabilities:
                     inv.status = "completed"
                     inv.completed_at = datetime.datetime.utcnow()
                     db.commit()
                     break
 
                 capability = decision["capability"]
-                params = decision["params"]
-                rationale = decision["rationale"]
+                params = decision.get("params", {})
+                rationale = decision.get("rationale", "")
 
                 # 2. Check Approval Gate
                 tool_instance = agent.tools.get_tool(capability)
@@ -161,6 +164,13 @@ class InvestigationService:
                             inv.discovered_dc = f.title.split(": ")[-1]
 
                 db.commit()
+
+                # If domain enumeration completed and anonymous bind is restricted, stop the loop
+                if capability == "domain_enumeration":
+                    inv.status = "completed"
+                    inv.completed_at = datetime.datetime.utcnow()
+                    db.commit()
+                    break
 
             if inv.status != "awaiting_approval":
                 inv.status = "completed"

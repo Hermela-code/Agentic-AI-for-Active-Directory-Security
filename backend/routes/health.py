@@ -20,10 +20,17 @@ def health_check():
     except Exception:
         ollama_ok = False
 
+    # Safely retrieve scope, prioritizing AUTHORIZED_SCOPES
+    scope = getattr(
+        settings, 
+        "AUTHORIZED_SCOPES", 
+        getattr(settings, "AUTHORIZED_SCOPE_CIDR", "unrestricted")
+    )
+
     return {
         "status": "healthy",
         "version": settings.VERSION,
-        "authorized_scope": settings.AUTHORIZED_SCOPE_CIDR,
+        "authorized_scope": scope,
         "services": {
             "api": "online",
             "ollama": "online" if ollama_ok else "offline"

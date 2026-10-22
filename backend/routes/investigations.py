@@ -58,3 +58,14 @@ def get_executions(inv_id: str, db: Session = Depends(get_db)):
 @router.get("/{inv_id}/approvals", response_model=List[ApprovalResponse])
 def get_approvals(inv_id: str, db: Session = Depends(get_db)):
     return db.query(ApprovalModel).filter(ApprovalModel.investigation_id == inv_id).all()
+
+@router.post("", response_model=InvestigationResponse, status_code=status.HTTP_201_CREATED)
+def start_investigation(req: StartInvestigationRequest):
+    inv = InvestigationService.start_investigation(req.target)
+    if not inv:
+        scope_info = settings.AUTHORIZED_SCOPES if settings.AUTHORIZED_SCOPES else "all scopes (invalid IP or unresolved host)"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Target '{req.target}' is invalid or outside the authorized scope ({scope_info})."
+        )
+    return inv
