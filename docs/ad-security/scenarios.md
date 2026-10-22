@@ -1,143 +1,62 @@
-# Active Directory Security Scenarios
+# Active Directory Security Scenarios & Validation Spec (GOAD-Light)
+**Author:** Feben Solomon (AD Security & Attack Validation)
 
-## 1. Purpose
+## 1. Overview & GOAD-Light Environment
+This document establishes the security techniques, indicator definitions, and human-in-the-loop (HITL) validation rules for testing against the **Game of Active Directory - Light (GOAD-Light)** environment.
 
-This document defines candidate Active Directory (AD) security scenarios for the Agentic AI for Active Directory Security project.
+### Target Environment Defaults
+- **Domain:** `sevenkingdoms.local`
+- **Domain Controller:** `DC01` / `kingslanding.sevenkingdoms.local`
+- **Scope Restriction:** Read-only reconnaissance is autonomous; ticket requests and credential validations require human approval.
 
-The scenarios will guide security-tool integration, agent analysis, and validation of findings in the authorized GOAD-Light lab.
+---
 
-No scenario in this document is considered confirmed until the required evidence has been collected and reviewed.
+## 2. Selected Security Scenarios
 
-## 2. Scope and Constraints
+### Scenario 1: Kerberoasting Opportunity (SPN Discovery)
+* **MITRE ATT&CK:** T1558.003 (Steal or Forge Kerberos Tickets: Kerberoasting)
+* **Technique Summary:** User accounts associated with a Service Principal Name (SPN) allow any domain-authenticated user to request a Ticket Granting Service (TGS) ticket. The service ticket is encrypted with the NTLM hash of the service account password. An attacker can extract this ticket and attempt offline password cracking.
+* **Passive Indicator (Read-only):**
+  * Object filter: `(&(servicePrincipalName=*)(!(objectClass=computer)))`
+  * Account attribute: `servicePrincipalName` is not empty.
+* **Validation Action (Requires Approval):**
+  * Request a TGS service ticket for the identified SPN using a standard Kerberos request.
+  * Verify whether the encryption type returned is weak (e.g., `arcfour-hmac-md5` / RC4).
+* **Remediation / Mitigation:**
+  * Enforce passwords with 25+ characters for service accounts, or migrate to Group Managed Service Accounts (gMSA).
+  * Configure encryption to enforce AES128/AES256 and disable RC4.
 
-- Target environment: authorized GOAD-Light lab only.
-- Objective: identify and explain selected AD security weaknesses using evidence from supported security tools.
-- Findings must distinguish observed facts, potential risks, and validated attack paths.
-- The agent must not report a vulnerability solely because a related account, attribute, or relationship exists.
-- Actions that could expose credentials or materially affect the environment require an explicitly approved and controlled validation process.
-- Credentials, secrets, and sensitive authentication material must not be included in ordinary findings or logs.
+---
 
-## 3. Scenario AD-01: Kerberoasting Exposure
+### Scenario 2: AS-REP Roasting (Pre-Authentication Disabled)
+* **MITRE ATT&CK:** T1558.004 (Steal or Forge Kerberos Tickets: AS-REP Roasting)
+* **Technique Summary:** When an account has the `DONT_REQ_PREAUTH` flag enabled in `userAccountControl`, any user can request an AS-REP message from the Key Distribution Center (KDC) without knowing the password. The AS-REP contains data encrypted with the user's password hash, which can be extracted for offline cracking.
+* **Passive Indicator (Read-only):**
+  * Object filter: `(userAccountControl:1.2.840.113556.1.4.803:=4194304)`
+  * Flag: `DONT_REQ_PREAUTH` (Bit `0x400000`).
+* **Validation Action (Requires Approval):**
+  * Send an `AS-REQ` without pre-authentication to verify the KDC returns an `AS-REP` rather than `KRB_ERROR(KDC_ERR_PREAUTH_REQUIRED)`.
+* **Remediation / Mitigation:**
+  * Untick "Do not require Kerberos preauthentication" on the account properties in Active Directory Users and Computers (ADUC).
 
-### Objective
+---
 
-Identify accounts associated with Service Principal Names (SPNs) and assess whether the available evidence supports a potential Kerberoasting risk.
+### Scenario 3: Anonymous / Null Session LDAP & SMB Binding
+* **MITRE ATT&CK:** T1087 (Account Discovery)
+* **Technique Summary:** Misconfigured Domain Controllers or member servers may permit anonymous binds or null session connections over SMB (port 445) or LDAP (port 389), exposing domain schema, users, and password policies to unauthenticated network actors.
+* **Passive Indicator:**
+  * Successful connection to LDAP port 389 with null bind credentials (`""`).
+* **Validation Action:**
+  * Query base naming contexts without credentials.
 
-### Evidence to collect
+---
 
-- Account identifier.
-- Whether an SPN is registered.
-- Account type and relevant attributes, when available.
-- Source tool and collection timestamp.
-- Any additional approved evidence needed to assess the risk.
+## 3. Human Approval & Safety Thresholds
 
-### Analysis requirements
+Every finding produced by the tools must be classified before action:
 
-- An SPN-associated account is not automatically vulnerable.
-- Explain why the observed configuration may create exposure.
-- Do not claim that an account password is weak or recoverable without supporting evidence.
-- Do not claim successful credential recovery unless a separately approved validation actually establishes it.
-
-### Expected finding
-
-A structured observation identifying the relevant account, the evidence collected, the potential security significance, and any missing evidence.
-
-### Recommended remediation
-
-Review whether the service account requires its SPN, apply a strong and managed account-password strategy, and consider an appropriate managed service account where supported.
-
-### Validation status
-
-NOT TESTED — GOAD-Light is not yet available to the researcher.
-
-## 4. Scenario AD-02: Kerberos Pre-Authentication Configuration
-
-### Objective
-
-Identify accounts whose Kerberos pre-authentication configuration may expose them to AS-REP roasting.
-
-### Evidence to collect
-
-- Account identifier.
-- Relevant Kerberos pre-authentication configuration.
-- Source tool and collection timestamp.
-- Whether the observation was independently verified.
-
-### Analysis requirements
-
-- Identify the relevant configuration explicitly.
-- Distinguish a configuration-based exposure from demonstrated password recovery.
-- Do not infer password strength or account compromise from the configuration alone.
-
-### Expected finding
-
-A structured observation explaining which account configuration was identified, why it matters, and what has or has not been validated.
-
-### Recommended remediation
-
-Enable Kerberos pre-authentication where operationally appropriate, investigate any required exceptions, and review affected accounts' credential-management practices.
-
-### Validation status
-
-NOT TESTED — GOAD-Light is not yet available to the researcher.
-
-## 5. Scenario AD-03: Privileged Group Membership and Access Relationships
-
-### Objective
-
-Identify selected privileged group memberships and relevant access relationships that may contribute to excessive privilege or a potential attack path.
-
-### Evidence to collect
-
-- Relevant account and group identifiers.
-- Observed group membership or permission relationship.
-- Source of the relationship data.
-- Scope of the privilege, where known.
-- Any missing information needed to determine practical impact.
-
-### Analysis requirements
-
-- Distinguish observed group membership from effective permissions.
-- Do not assume that every relationship creates an exploitable attack path.
-- Do not claim that a user can control another account or system unless the necessary relationships and permissions are supported by evidence.
-- Clearly identify inferred paths separately from validated paths.
-
-### Expected finding
-
-A structured observation describing the account or group, the relationship identified, its potential significance, and the additional evidence required to validate impact.
-
-### Recommended remediation
-
-Review privileged group membership, remove unnecessary privileges, apply least privilege, and periodically audit sensitive access relationships.
-
-### Validation status
-
-NOT TESTED — GOAD-Light is not yet available to the researcher.
-
-## 6. Common Finding Requirements
-
-Each finding should contain the following fields where applicable:
-
-- `scenario_id`
-- `title`
-- `affected_entities`
-- `severity`
-- `confidence`
-- `observation`
-- `evidence`
-- `security_impact`
-- `recommendation`
-- `validation_status`
-- `limitations`
-- `source_tool`
-- `collected_at`
-
-Severity and confidence must be based on documented criteria, not invented by the language model. If the evidence is insufficient, the system should report that limitation rather than manufacture a conclusion.
-
-## 7. Research and Validation Status
-
-The researcher has cloned the project repository but has not yet configured or accessed GOAD-Light.
-
-All three scenarios are proposed research targets. Their presence in this document does not establish that the lab contains the corresponding conditions.
-
-The next step is to confirm tool availability with the integration developer, prepare the authorized lab, and record actual observations against the criteria above.
+| Action Level | Autonomous Execution | Approval Required | Examples |
+| :--- | :--- | :--- | :--- |
+| **Observation** | YES | NO | Port scanning, LDAP object queries, parsing permissions |
+| **Controlled Validation** | NO | YES | Requesting Kerberos service tickets, querying AS-REP packets |
+| **Exploitation / Crack**| NO (OUT OF SCOPE) | NO (OUT OF SCOPE) | Offline dictionary cracking, shell execution, credential manipulation |
