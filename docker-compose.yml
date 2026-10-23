@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: agent_tiger_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tiger
+      POSTGRES_PASSWORD: tigerpassword
+      POSTGRES_DB: agent_tiger
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tiger -d agent_tiger"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: agent_tiger_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql+psycopg://tiger:tigerpassword@db:5432/agent_tiger
+      - OLLAMA_ENDPOINT=http://host.docker.internal:11434
+      - AUTHORIZED_SCOPE_CIDR=192.168.56.0/24
+    ports:
+      - "8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  postgres_data:
