@@ -1,0 +1,6 @@
+ldap3>=2.9,<3.0
+pydantic>=2.0,<3.0
+
+# External binaries required on PATH (not pip-installable):
+#   nmap  -> sudo apt install nmap
+#   nxc   -> pipx install netexec   (https://github.com/Pennyw0rth/NetExec)
