@@ -1,36 +1,10 @@
-/**
- * Shows tool executions as the agent's activity feed.
- * There is no decision_log field in the API — ToolExecutionResponse
- * (capability, status, output_summary, executed_at) is the closest
- * real equivalent of "what has the agent done so far".
- */
+function prettyStatus(status) { return String(status || 'unknown').replaceAll('_', ' ') }
 export default function ActivityLog({ executions }) {
-  const sorted = [...(executions || [])].sort(
-    (a, b) => new Date(a.executed_at) - new Date(b.executed_at)
-  )
-
-  return (
-    <div className="activity-log">
-      <h2>Agent Activity</h2>
-      {sorted.length === 0 && (
-        <p className="empty-state">No activity yet. Start an investigation above.</p>
-      )}
-      <ul>
-        {sorted.map((exec) => (
-          <li key={exec.id} className={`activity-entry status-${exec.status}`}>
-            <div className="activity-entry-header">
-              <span className="activity-capability">{exec.capability}</span>
-              <span className="activity-status">{exec.status}</span>
-            </div>
-            {exec.output_summary && (
-              <p className="activity-summary">{exec.output_summary}</p>
-            )}
-            <span className="activity-time">
-              {new Date(exec.executed_at).toLocaleTimeString()}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
+  const sorted = [...(executions || [])].sort((a, b) => new Date(b.executed_at) - new Date(a.executed_at))
+  return <div className="activity-log">
+    {sorted.length === 0 ? <div className="component-empty"><span className="empty-mini-icon">≋</span><strong>No activity recorded yet</strong><p>Agent tool executions will appear here as the investigation progresses.</p></div> : <ul>{sorted.map((exec, index) => <li key={exec.id ?? `${exec.capability}-${exec.executed_at}-${index}`} className="activity-entry">
+      <span className={`activity-timeline-dot ${String(exec.status).toLowerCase()}`}/><div className="activity-entry-body"><div className="activity-entry-header"><span className="activity-capability">{exec.capability || 'Tool execution'}</span><span className={`activity-status status-text-${String(exec.status || '').toLowerCase()}`}>{prettyStatus(exec.status)}</span></div>
+      {exec.output_summary && <p className="activity-summary">{exec.output_summary}</p>}<span className="activity-time">{exec.executed_at ? new Date(exec.executed_at).toLocaleString() : 'Time unavailable'}</span></div>
+    </li>)}</ul>}
+  </div>
 }

@@ -1,31 +1,4 @@
-export default function ApprovalPanel({ pendingApprovals, onApprove, onReject }) {
-  if (!pendingApprovals || pendingApprovals.length === 0) return null
-
-  return (
-    <div className="approval-panel">
-      <h2>⚠ Approval Required</h2>
-      {pendingApprovals.map((req) => (
-        <div key={req.id} className="approval-card">
-          <dl>
-            <dt>Action</dt>
-            <dd>{req.capability}</dd>
-            <dt>Target</dt>
-            <dd>{req.target}</dd>
-            <dt>Rationale</dt>
-            <dd>{req.rationale}</dd>
-            <dt>Risk</dt>
-            <dd>{req.risk_assessment}</dd>
-          </dl>
-          <div className="approval-actions">
-            <button className="approve-btn" onClick={() => onApprove(req.id)}>
-              Approve
-            </button>
-            <button className="reject-btn" onClick={() => onReject(req.id)}>
-              Reject
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
+export default function ApprovalPanel({ pendingApprovals, onApprove, onReject, busyApproval }) {
+  if (!pendingApprovals || pendingApprovals.length === 0) return <div className="approval-empty"><span className="approval-check">✓</span><div><strong>You're all caught up</strong><p>No pending actions require your approval for this investigation.</p></div></div>
+  return <div className="approval-panel">{pendingApprovals.map((request) => <article key={request.id} className="approval-card"><div className="approval-card-top"><span className="approval-warning">!</span><div><strong>{request.capability || 'Action request'}</strong><p>Agent action is paused until you make a decision.</p></div><span className="review-required">Review required</span></div><dl><div><dt>Target</dt><dd>{request.target || '—'}</dd></div><div><dt>Rationale</dt><dd>{request.rationale || 'No rationale provided.'}</dd></div><div><dt>Risk assessment</dt><dd>{request.risk_assessment || 'Not specified'}</dd></div></dl><div className="approval-actions"><button className="approve-btn" onClick={() => onApprove(request.id)} disabled={busyApproval === request.id}>{busyApproval === request.id ? 'Working…' : '✓ Approve action'}</button><button className="reject-btn" onClick={() => onReject(request.id)} disabled={busyApproval === request.id}>✕ Reject</button></div></article>)}</div>
 }
