@@ -1,6 +1,10 @@
 from tools.base import SecurityTool
-from tools.domain_enumeration import DomainEnumerationTool
-from tools.network_discovery import NetworkDiscoveryTool
+from tools.capabilities import (
+    ADUserEnumerationCapability,
+    CheckAdminAccessCapability,
+    DomainEnumerationCapability,
+    NetworkDiscoveryCapability,
+)
 
 
 class ToolRegistry:
@@ -18,8 +22,10 @@ class ToolRegistry:
         self._register_defaults()
 
     def _register_defaults(self):
-        self.register(NetworkDiscoveryTool())
-        self.register(DomainEnumerationTool())
+        self.register(NetworkDiscoveryCapability())
+        self.register(DomainEnumerationCapability())
+        self.register(ADUserEnumerationCapability())
+        self.register(CheckAdminAccessCapability())
 
     def register(self, tool: SecurityTool) -> None:
         self.tools[tool.name] = tool
