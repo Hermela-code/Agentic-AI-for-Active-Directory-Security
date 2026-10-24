@@ -13,9 +13,11 @@ class Settings(BaseSettings):
     # Leave empty ("") to allow any target without subnet boundary enforcement.
     # Example for .env: AUTHORIZED_SCOPES="10.0.0.0/8,172.16.0.0/12,ad.corporate.internal"
     AUTHORIZED_SCOPES: str = ""
+    # Optional single CIDR scope (legacy env var)
+    AUTHORIZED_SCOPE_CIDR: str = ""
 
     # Flag to explicitly enable or disable strict scope boundaries
-    ENFORCE_SCOPE_CHECK: bool = False
+    ENFORCE_SCOPE_CHECK: bool = True
 
     # Database Configuration
     DATABASE_URL: str = "sqlite:///./agent_tiger.db"
@@ -38,19 +40,18 @@ class Settings(BaseSettings):
     )
 
     def get_authorized_networks(self) -> List[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]]:
-        """Parses defined CIDR strings into IP network objects."""
-        if not self.AUTHORIZED_SCOPES.strip():
-            return []
-
+        """Parses defined CIDR strings and legacy CIDR into IP network objects."""
+        entries = []
+        if self.AUTHORIZED_SCOPES.strip():
+            entries.extend([e.strip() for e in self.AUTHORIZED_SCOPES.split(",") if e.strip()])
+        if self.AUTHORIZED_SCOPE_CIDR.strip():
+            entries.append(self.AUTHORIZED_SCOPE_CIDR.strip())
         networks = []
-        for raw_entry in self.AUTHORIZED_SCOPES.split(","):
-            entry = raw_entry.strip()
-            if not entry:
-                continue
+        for entry in entries:
             try:
                 networks.append(ipaddress.ip_network(entry, strict=False))
             except ValueError:
-                # Entry might be a domain name rather than a CIDR; handled in target check
+                # Ignore invalid entries (could be domains)
                 continue
         return networks
 
@@ -77,10 +78,12 @@ class Settings(BaseSettings):
         except ValueError:
             return False
 
-        # If scope enforcement is disabled or no scopes are set, any valid IP/host is permitted
-        if not self.ENFORCE_SCOPE_CHECK or not self.AUTHORIZED_SCOPES.strip():
+        # If scope enforcement is disabled, any valid IP/host is permitted
+        if not self.ENFORCE_SCOPE_CHECK:
             return True
-
+        # If no scopes are defined, permissive behavior
+        if not (self.AUTHORIZED_SCOPES.strip() or self.AUTHORIZED_SCOPE_CIDR.strip()):
+            return True
         # Check against authorized networks
         networks = self.get_authorized_networks()
         return any(target_ip in net for net in networks)

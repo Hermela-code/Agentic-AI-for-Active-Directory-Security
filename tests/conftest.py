@@ -1,3 +1,8 @@
+import os
+
+# Set test environment baseline before importing backend application modules
+os.environ.setdefault("AUTHORIZED_SCOPE_CIDR", "192.168.56.0/24")
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine

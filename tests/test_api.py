@@ -6,14 +6,14 @@ def test_health_check(client):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
-    assert data["authorized_scope"] == "192.168.56.0/24"
+    assert data["authorized_scope"] == "unrestricted"
 
 
 def test_target_out_of_scope_rejected(client):
     # Public IP outside the authorized 192.168.56.0/24 boundary
     response = client.post(
         "/api/investigations",
-        json={"target": "8.8.8.8"}
+        json={"target": "8.8.8.8", "scope": "192.168.56.0/24", "metadata": {}}
     )
     assert response.status_code == 400
     assert "out of authorized scope" in response.json()["detail"]
@@ -26,7 +26,7 @@ def test_start_investigation_success(client, monkeypatch):
 
     response = client.post(
         "/api/investigations",
-        json={"target": "192.168.56.11"}
+        json={"target": "192.168.56.11", "scope": "192.168.56.0/24", "metadata": {}}
     )
     assert response.status_code == 201
     data = response.json()

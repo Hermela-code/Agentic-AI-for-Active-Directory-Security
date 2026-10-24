@@ -35,12 +35,14 @@ async function request(path, options = {}) {
   return res.json()
 }
 
-export function startInvestigation(target) {
+export function startInvestigation({ target, scope, metadata }) {
   return request('/investigations', {
     method: 'POST',
-    body: JSON.stringify({ target }),
+    body: JSON.stringify({ target, scope, metadata }),
   })
 }
+
+
 
 export function getInvestigation(id) {
   return request(`/investigations/${id}`)

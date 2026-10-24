@@ -9,6 +9,8 @@ class InvestigationModel(Base):
 
     id = Column(String(64), primary_key=True, index=True)
     target = Column(String(64), nullable=False)
+    scope = Column(String(64), nullable=True)  # Authorized CIDR scope provided by UI
+    investigation_metadata = Column(JSON, nullable=True)   # Optional investigation metadata
     status = Column(String(32), default="pending", index=True)
     current_step = Column(Integer, default=0)
     discovered_domain = Column(String(128), nullable=True)

@@ -20,8 +20,9 @@ export default function StatusPanel({ investigation }) {
         <dt>Step</dt>
         <dd>{investigation.current_step}</dd>
 
-        <dt>Discovered Domain</dt>
-        <dd>{investigation.discovered_domain || '—'}</dd>
+
+        <dt>Authorized Scope</dt>
+        <dd>{investigation.scope || '—'}</dd>
 
         <dt>Discovered DC</dt>
         <dd>{investigation.discovered_dc || '—'}</dd>

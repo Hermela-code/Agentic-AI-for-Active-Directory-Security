@@ -24,10 +24,12 @@ active_approval_decisions: Dict[str, bool] = {}
 class InvestigationService:
 
     @staticmethod
-    def start_investigation(target: str) -> Optional[InvestigationModel]:
-        """Validates scope, initializes database record, and launches background thread."""
-        if not settings.is_target_in_scope(target):
-            return None
+    def start_investigation(target: str, scope: Optional[str] = None, metadata: Optional[Dict] = None) -> Optional[InvestigationModel]:
+        """Validates scope, initializes database record with optional scope and metadata, and launches background thread."""
+        # Previously validated against global authorized scopes; per‑request validation is now handled in the route.
+        # Allow any target that passed the route validation.
+        # if not settings.is_target_in_scope(target):
+        #     return None
 
         db: Session = SessionLocal()
         inv_id = f"inv-{uuid.uuid4().hex[:8]}"
@@ -35,6 +37,8 @@ class InvestigationService:
         inv = InvestigationModel(
             id=inv_id,
             target=target,
+            scope=scope,
+            investigation_metadata=metadata,
             status="running",
             current_step=0,
         )

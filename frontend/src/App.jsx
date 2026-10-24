@@ -27,20 +27,21 @@ export default function App() {
 
   const isActive = investigation && ACTIVE_STATUSES.has(investigation.status)
 
-  async function handleStart(target) {
+  async function handleStart({ target, scope, metadata }) {
     setError(null)
     try {
-      const inv = await startInvestigation(target)
+      const inv = await startInvestigation({ target, scope, metadata })
       setInvestigation(inv)
       setFindings([])
       setExecutions([])
       setPendingApprovals([])
     } catch (e) {
-      setError(
-        `Could not start investigation (${e.message}). Confirm the backend is running at the configured VITE_BACKEND_URL and the target is within the authorized scope.`
-      )
+      setError(`Could not start investigation (${e.message}). Confirm the backend is running at the configured VITE_BACKEND_URL and the target/scope are within authorized boundaries.`)
     }
   }
+
+
+
 
   async function refresh() {
     if (!investigation?.id) return

@@ -5,13 +5,16 @@ from pydantic import BaseModel, Field
 
 # Request to start an investigation
 class StartInvestigationRequest(BaseModel):
-    target: str = Field(..., example="192.168.56.11", description="Target IP inside authorized GOAD subnet")
+    target: str = Field(..., example="192.168.56.11", description="Target IP or hostname inside authorized scope")
+    scope: str = Field(..., example="192.168.56.0/24", description="Authorized CIDR scope for the investigation")
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Optional investigation metadata")
 
 
 # Response when investigation is created
 class InvestigationResponse(BaseModel):
     id: str
     target: str
+    scope: Optional[str] = None
     status: str
     current_step: int
     discovered_domain: Optional[str] = None

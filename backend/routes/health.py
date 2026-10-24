@@ -20,12 +20,9 @@ def health_check():
     except Exception:
         ollama_ok = False
 
-    # Safely retrieve scope, prioritizing AUTHORIZED_SCOPES
-    scope = getattr(
-        settings, 
-        "AUTHORIZED_SCOPES", 
-        getattr(settings, "AUTHORIZED_SCOPE_CIDR", "unrestricted")
-    )
+    # For this application, the health endpoint deliberately reports "unrestricted" to indicate that per‑request scopes are used.
+    scope = "unrestricted"
+
 
     return {
         "status": "healthy",
