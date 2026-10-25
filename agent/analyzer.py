@@ -4,14 +4,33 @@ from agent.models import AnalysisResult, Finding, ToolResult
 
 
 class ADAnalyzer:
+    """Analyzes security tool results and extracts structured Active Directory information.
+
+    Supports recon tool output for Phase 1 service fingerprinting.
+    """
     """Analyzes security tool results and extracts structured Active Directory information."""
 
-    def analyze(self, result: ToolResult) -> AnalysisResult:
+        def analyze(self, result: ToolResult) -> AnalysisResult:
+        """Dispatch analysis based on tool name.
+
+        - ``domain_enumeration`` → detailed LDAP enumeration analysis.
+        - ``network_discovery`` → generic port‑scan analysis.
+        - ``recon`` → Phase 1 AD service fingerprinting.
+        """
+        if result.tool == "domain_enumeration":
+            return self._analyze_domain_enum(result)
+        if result.tool == "recon":
+            return self._analyze_recon(result)
+        return self._analyze_network_discovery(result)
         if result.tool == "domain_enumeration":
             return self._analyze_domain_enum(result)
         return self._analyze_network_discovery(result)
 
-    def _analyze_network_discovery(self, result: ToolResult) -> AnalysisResult:
+        def _analyze_network_discovery(self, result: ToolResult) -> AnalysisResult:
+        """Legacy analysis for plain text network discovery output.
+
+        Retained for compatibility with ``NetworkDiscoveryCapability``.
+        """
         output = result.output.lower()
         findings: List[Finding] = []
 
@@ -69,6 +88,7 @@ class ADAnalyzer:
         )
 
     def _analyze_domain_enum(self, result: ToolResult) -> AnalysisResult:
+        """Existing LDAP enumeration analysis unchanged.""
         findings: List[Finding] = []
         output = result.output
 

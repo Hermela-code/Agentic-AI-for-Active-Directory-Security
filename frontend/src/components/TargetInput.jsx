@@ -6,7 +6,7 @@ export default function TargetInput({ onStart, disabled }) {
   const [metadata, setMetadata] = useState('')
   const [error, setError] = useState(null)
 
-  function handleSubmit(e) {
+  function handleSubmit(e) { console.log('Submitting target input');
     e.preventDefault()
     const trimmedTarget = target.trim()
     const trimmedScope = scope.trim()
@@ -20,6 +20,7 @@ export default function TargetInput({ onStart, disabled }) {
     }
     setError(null)
     // Pass both target and scope (and optional metadata) to parent handler
+    console.log('Calling onStart with', { target: trimmedTarget, scope: trimmedScope, metadata: metadata.trim() });
     onStart({ target: trimmedTarget, scope: trimmedScope, metadata: metadata.trim() })
   }
 

@@ -14,6 +14,9 @@ from backend.models.orm import (
 )
 from agent.agent import ADAgent
 from agent.models import InvestigationState, CapabilityTier, ApprovalStatus
+# Import Recon tool and analyzer for Phase 1 recon
+from tools.recon_tool import ReconTool
+from agent.analyzer import ADAnalyzer
 
 
 # Thread-safe dictionary to hold active approval event signals
@@ -45,6 +48,40 @@ class InvestigationService:
         db.add(inv)
         db.commit()
         db.refresh(inv)
+
+        # ---- Phase 1: Passive reconnaissance ----
+        # Execute ReconTool synchronously to gather AD service fingerprints.
+        recon_tool = ReconTool()
+        recon_result = recon_tool.run(target)
+        # Persist the tool execution record.
+        exec_record = ToolExecutionModel(
+            investigation_id=inv_id,
+            capability=recon_tool.name,
+            target=target,
+            status=recon_result.status,
+            output_summary=recon_result.output[:500] if recon_result.output else "",
+        )
+        db.add(exec_record)
+        # Analyze the recon output to generate findings and populate discovery fields.
+        analyzer = ADAnalyzer()
+        analysis = analyzer.analyze(recon_result)
+        for f in analysis.findings:
+            if not any(ef.title == f.title for ef in inv.findings):
+                db_finding = FindingModel(
+                    investigation_id=inv_id,
+                    title=f.title,
+                    severity=f.severity,
+                    description=f.description,
+                    evidence=f.evidence,
+                )
+                db.add(db_finding)
+                # Capture domain / DC info if present in titles.
+                if "Active Directory Domain Identified" in f.title:
+                    inv.discovered_domain = f.title.split(": ")[-1]
+                if "Domain Controller Hostname" in f.title:
+                    inv.discovered_dc = f.title.split(": ")[-1]
+        db.commit()
+
         db.close()
 
         # Run investigation worker in background thread
