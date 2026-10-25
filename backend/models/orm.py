@@ -12,6 +12,7 @@ class InvestigationModel(Base):
     scope = Column(String(64), nullable=True)  # Authorized CIDR scope provided by UI
     investigation_metadata = Column(JSON, nullable=True)   # Optional investigation metadata
     status = Column(String(32), default="pending", index=True)
+    failure_reason = Column(String(256), nullable=True)  # Stores LLM or other runtime failure messages
     current_step = Column(Integer, default=0)
     discovered_domain = Column(String(128), nullable=True)
     discovered_dc = Column(String(128), nullable=True)
