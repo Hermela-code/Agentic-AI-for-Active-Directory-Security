@@ -63,6 +63,7 @@ class ApprovalResponse(BaseModel):
     params: Dict[str, Any] = {}
     rationale: str
     risk_assessment: str
+    risk_level: str = "High"
     status: str
     requested_at: datetime.datetime
     decided_at: Optional[datetime.datetime] = None

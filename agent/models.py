@@ -50,6 +50,7 @@ class ApprovalRequest(BaseModel):
     params: dict = {}
     rationale: str
     risk_assessment: str
+    risk_level: str = "High"
     status: ApprovalStatus = ApprovalStatus.PENDING
 
 

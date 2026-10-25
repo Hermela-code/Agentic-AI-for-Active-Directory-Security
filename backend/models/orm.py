@@ -62,6 +62,7 @@ class ApprovalModel(Base):
     params = Column(JSON, default=dict)
     rationale = Column(Text, nullable=False)
     risk_assessment = Column(Text, nullable=False)
+    risk_level = Column(String(32), default="High", nullable=False)
     status = Column(String(32), default="pending", index=True)  # pending, approved, rejected
     requested_at = Column(DateTime, default=datetime.datetime.utcnow)
     decided_at = Column(DateTime, nullable=True)
