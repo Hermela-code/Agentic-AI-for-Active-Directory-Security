@@ -92,11 +92,16 @@ export default function App() {
 
   useEffect(() => {
     if (!investigation?.id) return undefined
-
+    // Always refresh on load or ID change
     refresh()
     if (isActive) {
+      // Start polling while investigation is active
       pollRef.current = setInterval(refresh, POLL_INTERVAL_MS)
+    } else {
+      // Ensure any existing interval is cleared when not active (e.g., completed)
+      clearInterval(pollRef.current)
     }
+    // Cleanup on unmount or when dependencies change
     return () => clearInterval(pollRef.current)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [investigation?.id, isActive])

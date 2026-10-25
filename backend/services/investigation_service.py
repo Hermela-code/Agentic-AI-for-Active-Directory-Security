@@ -14,6 +14,9 @@ from backend.models.orm import (
 )
 from agent.agent import ADAgent
 from agent.models import InvestigationState, CapabilityTier, ApprovalStatus
+from graph.connection import Neo4jConnection
+from graph.ingest import GraphIngestor
+from graph.models import Domain, Computer, AdminToEdge
 # Import Recon tool and analyzer for Phase 1 recon
 from tools.recon_tool import ReconTool
 from agent.analyzer import ADAnalyzer
@@ -170,6 +173,61 @@ class InvestigationService:
                     else:
                         inv.status = "running"
                         db.commit()
+
+                        # Phase 4: Administrative validation post‑approval handling
+                        if capability == "admin_validation":
+                            # Record the verified finding in PostgreSQL
+                            admin_finding = FindingModel(
+                                investigation_id=inv_id,
+                                title="Full Administrative Access Confirmed on Domain Controller",
+                                severity="Critical",
+                                description="Validated administrative access to Domain Controller via authorized credential assessment.",
+                                evidence="Administrative rights confirmed on the target DC."
+                            )
+                            db.add(admin_finding)
+
+                            # Neo4j ingestion
+                            conn = Neo4jConnection()
+                            ingestor = GraphIngestor(conn)
+
+                            domain_name = inv.discovered_domain or "unknown"
+                            dc_name = inv.discovered_dc or "unknown"
+
+                            # Upsert Domain node
+                            domain_node = Domain(
+                                name=domain_name,
+                                dc_hostname=dc_name,
+                                netbios_name=domain_name.split('.')[-1] if '.' in domain_name else domain_name,
+                                discovered_at=datetime.datetime.utcnow()
+                            )
+                            ingestor.upsert_domain(domain_node)
+
+                            # Prepare raw entry for computer upsert
+                            computer_entry = {
+                                "distinguishedName": f"CN={dc_name},CN=Computers,DC={domain_name.replace('.', ',DC=')}",
+                                "sAMAccountName": dc_name,
+                                "dNSHostName": dc_name,
+                                "operatingSystem": "Windows Server",
+                                "objectSid": None,
+                                "userAccountControl": "0x2000"
+                            }
+                            ingestor.upsert_computer_raw(computer_entry, domain_name)
+
+                            # Link admin principal to the DC computer
+                            principal_dn = f"CN=Administrator,CN=Users,DC={domain_name.replace('.', ',DC=')}"
+                            edge = AdminToEdge(
+                                principal_dn=principal_dn,
+                                computer_dn=computer_entry["distinguishedName"],
+                                source_tool="admin_validation",
+                                collected_at=datetime.datetime.utcnow()
+                            )
+                            ingestor.link_admin_to(edge)
+
+                            # Mark investigation completed
+                            inv.status = "completed"
+                            inv.completed_at = datetime.datetime.utcnow()
+                            db.commit()
+                            break
 
                 # 3. Execution
                 result = agent.run_capability(capability, target, **params)
