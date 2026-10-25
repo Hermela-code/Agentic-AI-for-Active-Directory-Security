@@ -26,6 +26,9 @@ class ToolRegistry:
         self.register(DomainEnumerationCapability())
         self.register(ADUserEnumerationCapability())
         self.register(CheckAdminAccessCapability())
+        # Register SMB anonymous audit capability
+        from tools.smb_audit_tool import SMBAnonymousAuditTool
+        self.register(SMBAnonymousAuditTool())
 
     def register(self, tool: SecurityTool) -> None:
         self.tools[tool.name] = tool
