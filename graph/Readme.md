@@ -53,7 +53,7 @@ git pull origin main
 pip install -r graph/requirements.txt --break-system-packages
 
 # 3. Set your Neo4j password
-export NEO4J_PASSWORD=yourpassword
+export NEO4J_PASSWORD=insa@123
 
 # 4. Apply the schema (constraints + indexes)
 python3 -m graph.schema
