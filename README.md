@@ -1,4 +1,4 @@
-# Agentic AI for Active Directory Security
+## Agentic AI for Active Directory Security
 
 An agentic AI system designed to investigate Active Directory environments, identify potential security weaknesses, and explain possible attack paths. The project combines AI-powered analysis with human approval to support security investigations in an authorized lab environment.
 
