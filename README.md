@@ -40,7 +40,7 @@ The objective is to make Active Directory security investigations easier to unde
 
 ## 4. Video Presentation
 - **Five-Minute Project Demonstration (Feben Solomon - AD Security & Attack Validation):**
-- [Watch the Project Presentation] [i have sent it via telegram due to connection issues i could not upload it on drive in time](https://drive.google.com/file/d/190y_dCc79RNNtIv3PeGzuQNKYWDmT7qX/view?usp=sharing)
+- [Watch the Project Presentation] (https://drive.google.com/file/d/190y_dCc79RNNtIv3PeGzuQNKYWDmT7qX/view?usp=sharing)
 
 ## 5. GitHub Repository
 - **Repository Link:** [Agentic AI for Active Directory Security](https://github.com/HermelaGirma/Agentic-AI-for-Active-Directory-Security)
