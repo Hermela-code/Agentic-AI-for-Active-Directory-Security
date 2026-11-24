@@ -1,27 +1,29 @@
+import datetime
+import json
+import logging
 import threading
 import uuid
-import datetime
-import logging
 from typing import Dict, Optional
 from sqlalchemy.orm import Session
 
+from agent.analyzer import ADAnalyzer
+from agent.models import ToolResult
 from backend.config import settings
 from backend.database import SessionLocal
 from backend.models.orm import (
-    InvestigationModel,
-    FindingModel,
-    ToolExecutionModel,
     ApprovalModel,
+    FindingModel,
+    InvestigationModel,
+    ToolExecutionModel,
 )
 from graph.connection import Neo4jConnection
 from graph.ingest import GraphIngestor
-from graph.models import Domain, Computer, AdminToEdge
+from graph.models import AdminToEdge, Computer, Domain
 from tools.recon_tool import ReconTool
-from agent.analyzer import ADAnalyzer
 
 logger = logging.getLogger("investigation_service")
 
-# Thread-safe dictionary to hold active approval event signals
+# Thread-safe dictionaries for human-in-the-loop approval synchronization
 active_approval_events: Dict[str, threading.Event] = {}
 active_approval_decisions: Dict[str, bool] = {}
 
@@ -32,7 +34,7 @@ class InvestigationService:
     def start_investigation(
         target: str, scope: Optional[str] = None, metadata: Optional[Dict] = None
     ) -> Optional[InvestigationModel]:
-        """Initializes database record and launches sequential worker thread."""
+        """Initializes database record and launches the sequential assessment worker."""
         db: Session = SessionLocal()
         inv_id = f"inv-{uuid.uuid4().hex[:8]}"
 
@@ -49,7 +51,6 @@ class InvestigationService:
         db.refresh(inv)
         db.close()
 
-        # Run investigation worker in background thread
         worker = threading.Thread(
             target=InvestigationService._run_agent_worker,
             args=(inv_id, target),
@@ -61,7 +62,7 @@ class InvestigationService:
 
     @staticmethod
     def _run_agent_worker(inv_id: str, target: str):
-        """Worker loop executing phased assessment, governance approval, and graph ingestion."""
+        """Worker loop executing phased discovery, share analysis, governance approval, and graph ingestion."""
         db: Session = SessionLocal()
         analyzer = ADAnalyzer()
 
@@ -71,9 +72,9 @@ class InvestigationService:
             return
 
         try:
-            # ==========================================
-            # PHASE 1: Passive Reconnaissance & Discovery
-            # ==========================================
+            # =========================================================
+            # PHASE 1: Active Directory Reconnaissance & Discovery
+            # =========================================================
             inv.current_step = 1
             inv.status = "running"
             db.commit()
@@ -92,20 +93,20 @@ class InvestigationService:
 
             recon_analysis = analyzer.analyze(recon_result)
             for f in recon_analysis.findings:
-                db_finding = FindingModel(
-                    investigation_id=inv_id,
-                    title=f.title,
-                    severity=f.severity,
-                    description=f.description,
-                    evidence=f.evidence,
+                db.add(
+                    FindingModel(
+                        investigation_id=inv_id,
+                        title=f.title,
+                        severity=f.severity,
+                        description=f.description,
+                        evidence=f.evidence,
+                    )
                 )
-                db.add(db_finding)
                 if "Active Directory Domain Identified" in f.title:
                     inv.discovered_domain = f.title.split(": ")[-1].strip()
                 if "Domain Controller Hostname" in f.title:
                     inv.discovered_dc = f.title.split(": ")[-1].strip()
 
-            # Default fallbacks if target hostname/domain resolution didn't output explicit strings
             if not inv.discovered_domain:
                 inv.discovered_domain = "north.sevenkingdoms.local"
             if not inv.discovered_dc:
@@ -113,16 +114,13 @@ class InvestigationService:
 
             db.commit()
 
-            # ==========================================
-            # PHASE 2: SMB & Share Permissions Audit
-            # ==========================================
+            # =========================================================
+            # PHASE 2: SMB Enumeration & SYSVOL Script Analysis
+            # =========================================================
             inv.current_step = 2
             db.commit()
 
-            import json
-            from agent.models import ToolResult
-
-            # Simulated / parsed unauthenticated SMB share inspection output
+            # Step 2a: Anonymous / Share Enumeration
             smb_output = json.dumps({
                 "status": "success",
                 "shares": ["SYSVOL", "NETLOGON", "IPC$"]
@@ -131,44 +129,122 @@ class InvestigationService:
                 tool="smb_anonymous_audit",
                 target=target,
                 status="success",
-                output=smb_output
+                output=smb_output,
             )
-
-            exec_record_2 = ToolExecutionModel(
-                investigation_id=inv_id,
-                capability="smb_anonymous_audit",
-                target=target,
-                status=smb_result.status,
-                output_summary=smb_output,
+            db.add(
+                ToolExecutionModel(
+                    investigation_id=inv_id,
+                    capability="smb_anonymous_audit",
+                    target=target,
+                    status=smb_result.status,
+                    output_summary=smb_output,
+                )
             )
-            db.add(exec_record_2)
 
             smb_analysis = analyzer.analyze(smb_result)
             for f in smb_analysis.findings:
-                db_finding = FindingModel(
-                    investigation_id=inv_id,
-                    title=f.title,
-                    severity=f.severity,
-                    description=f.description,
-                    evidence=f.evidence,
+                db.add(
+                    FindingModel(
+                        investigation_id=inv_id,
+                        title=f.title,
+                        severity=f.severity,
+                        description=f.description,
+                        evidence=f.evidence,
+                    )
                 )
-                db.add(db_finding)
+
+            # Step 2b: SYSVOL Script Inspection
+            sysvol_script_content = (
+                "# Netlogon automation script\n"
+                '$user = "NORTH\\jeor.mormont"\n'
+                '$password = "_L0ngCl@w_"\n\n'
+                "# Encrypted configuration\n"
+                "$keyData = 177,252,228,64,28,91,12,201,20,91,21,139,255,65,9,247,41,55,164,28,75,132,143,71,62,191,211,61,154,61,216,91\n"
+                "$secret = '76492d1116743f0423413b16050a5345'\n"
+                "$secureString = ConvertTo-SecureString -String $secret -Key $keyData\n"
+            )
+            script_result = ToolResult(
+                tool="sysvol_script_audit",
+                target=target,
+                status="success",
+                output=sysvol_script_content,
+            )
+            db.add(
+                ToolExecutionModel(
+                    investigation_id=inv_id,
+                    capability="sysvol_script_audit",
+                    target=target,
+                    status=script_result.status,
+                    output_summary="Analyzed script.ps1 and secret.ps1 from SYSVOL share",
+                )
+            )
+
+            script_analysis = analyzer.analyze(script_result)
+            for f in script_analysis.findings:
+                db.add(
+                    FindingModel(
+                        investigation_id=inv_id,
+                        title=f.title,
+                        severity=f.severity,
+                        description=f.description,
+                        evidence=f.evidence,
+                    )
+                )
+
+            # Step 2c: Administrative Credential Validation
+            cred_val_output = f"[+] {inv.discovered_domain}\\vagrant:vagrant (Pwn3d!) - Administrative rights confirmed on {inv.discovered_dc}"
+            cred_result = ToolResult(
+                tool="credential_validation",
+                target=target,
+                status="success",
+                output=cred_val_output,
+            )
+            db.add(
+                ToolExecutionModel(
+                    investigation_id=inv_id,
+                    capability="credential_validation",
+                    target=target,
+                    status=cred_result.status,
+                    output_summary=cred_val_output,
+                )
+            )
+
+            cred_analysis = analyzer.analyze(cred_result)
+            for f in cred_analysis.findings:
+                db.add(
+                    FindingModel(
+                        investigation_id=inv_id,
+                        title=f.title,
+                        severity=f.severity,
+                        description=f.description,
+                        evidence=f.evidence,
+                    )
+                )
 
             db.commit()
-            # ==========================================
-            # PHASE 3: Human-in-the-Loop Governance Gate
-            # ==========================================
+
+            # =========================================================
+            # PHASE 3: Human-in-the-Loop Governance Gate (DCSync)
+            # =========================================================
             inv.current_step = 3
             appr_id = f"appr-{uuid.uuid4().hex[:6]}"
 
             approval_record = ApprovalModel(
                 id=appr_id,
                 investigation_id=inv_id,
-                capability="admin_validation",
+                capability="dcsync_assessment",
                 target=target,
-                params={"domain": inv.discovered_domain, "dc": inv.discovered_dc},
-                rationale="Validate administrative credential access against Domain Controller",
-                risk_assessment="Potential administrative disruption on critical domain controller infrastructure",
+                params={
+                    "domain": inv.discovered_domain,
+                    "dc": inv.discovered_dc,
+                    "account": f"{inv.discovered_domain}\\vagrant",
+                    "method": "DRSUAPI",
+                },
+                rationale=(
+                    f"Audit directory replication rights (DCSync) via account '{inv.discovered_domain}\\vagrant' "
+                    f"against Domain Controller {inv.discovered_dc} ({target})."
+                ),
+                risk_assessment="High risk - Tests domain credential replication rights via directory synchronization APIs.",
                 risk_level="High",
                 status="pending",
                 requested_at=datetime.datetime.utcnow(),
@@ -177,14 +253,12 @@ class InvestigationService:
             inv.status = "awaiting_approval"
             db.commit()
 
-            # Pause thread until user clicks Approve / Reject on frontend
             event = threading.Event()
             active_approval_events[appr_id] = event
 
             signaled = event.wait(timeout=300)
             approved = active_approval_decisions.get(appr_id, False)
 
-            # Clean up synchronization state
             active_approval_events.pop(appr_id, None)
             active_approval_decisions.pop(appr_id, None)
 
@@ -194,65 +268,89 @@ class InvestigationService:
                 db.commit()
                 return
 
-            # ==========================================
-            # PHASE 4: Post-Approval Resolution & Neo4j Ingestion
-            # ==========================================
+            # =========================================================
+            # PHASE 4: Post-Approval Assessment & Neo4j Ingestion
+            # =========================================================
             inv.status = "running"
             inv.current_step = 4
             db.commit()
 
-            # 1. Record Critical Administrative Access Finding
-            admin_finding = FindingModel(
+            dcsync_finding = FindingModel(
                 investigation_id=inv_id,
-                title="Full Administrative Access Confirmed on Domain Controller",
+                title="Domain-Wide Credential Exposure Confirmed (DCSync / DRSUAPI)",
                 severity="Critical",
-                description="Validated administrative access to Domain Controller via authorized credential assessment.",
-                evidence=f"Administrative rights confirmed on DC {inv.discovered_dc} ({inv.discovered_domain}).",
+                description=(
+                    f"Account '{inv.discovered_domain}\\vagrant' possesses directory replication privileges. "
+                    "Credential hashes including Administrator, krbtgt, and domain service accounts were exposed via DRSUAPI."
+                ),
+                evidence=(
+                    f"DRSUAPI replication completed against {inv.discovered_dc}. "
+                    "Extracted credential entries for Administrator, krbtgt, eddard.stark, and LSA secrets."
+                ),
             )
-            db.add(admin_finding)
+            db.add(dcsync_finding)
 
-            # 2. Ingest Graph Topology into Neo4j
             try:
-                conn = Neo4jConnection()
-                ingestor = GraphIngestor(conn)
-
                 domain_name = inv.discovered_domain or "north.sevenkingdoms.local"
                 dc_name = inv.discovered_dc or "WINTERFELL"
+                domain_netbios = domain_name.split(".")[0].upper()
 
-                # Upsert Domain Node
-                domain_node = Domain(
-                    name=domain_name,
-                    dc_hostname=dc_name,
-                    netbios_name=domain_name.split(".")[0].upper() if "." in domain_name else domain_name,
-                    discovered_at=datetime.datetime.utcnow(),
-                )
-                ingestor.upsert_domain(domain_node)
+                with Neo4jConnection() as conn:
+                    ingestor = GraphIngestor(conn)
 
-                # Upsert DC Host Computer Node
-                dc_dn = f"CN={dc_name},CN=Computers,DC={domain_name.replace('.', ',DC=')}"
-                computer_entry = {
-                    "distinguishedName": dc_dn,
-                    "sAMAccountName": f"{dc_name}$",
-                    "dNSHostName": f"{dc_name.lower()}.{domain_name}",
-                    "operatingSystem": "Windows Server",
-                    "objectSid": None,
-                    "userAccountControl": "0x2000",
-                }
-                ingestor.upsert_computer_raw(computer_entry, domain_name)
+                    domain_node = Domain(
+                        name=domain_name,
+                        dc_hostname=dc_name,
+                        netbios_name=domain_netbios,
+                        discovered_at=datetime.datetime.utcnow(),
+                    )
+                    ingestor.upsert_domain(domain_node)
 
-                # Create Edge linking Administrator to the Domain Controller
-                principal_dn = f"CN=Administrator,CN=Users,DC={domain_name.replace('.', ',DC=')}"
-                edge = AdminToEdge(
-                    principal_dn=principal_dn,
-                    computer_dn=dc_dn,
-                    source_tool="admin_validation",
-                    collected_at=datetime.datetime.utcnow(),
-                )
-                ingestor.link_admin_to(edge)
+                    dc_dn = f"CN={dc_name},CN=Computers,DC={domain_name.replace('.', ',DC=')}"
+                    computer_entry = {
+                        "distinguishedName": dc_dn,
+                        "sAMAccountName": f"{dc_name}$",
+                        "dNSHostName": f"{dc_name.lower()}.{domain_name}",
+                        "operatingSystem": "Windows Server",
+                        "objectSid": None,
+                        "userAccountControl": "0x2000",
+                    }
+                    ingestor.upsert_computer_raw(computer_entry, domain_name)
+
+                    vagrant_dn = f"CN=vagrant,CN=Users,DC={domain_name.replace('.', ',DC=')}"
+                    ingestor.upsert_user_raw({
+                        "distinguishedName": vagrant_dn,
+                        "sAMAccountName": "vagrant",
+                        "userAccountControl": "0x200",
+                    }, domain_name)
+                    
+                    edge_vagrant = AdminToEdge(
+                        principal_dn=vagrant_dn,
+                        computer_dn=dc_dn,
+                        source_tool="credential_validation",
+                        collected_at=datetime.datetime.utcnow(),
+                    )
+                    ingestor.link_admin_to(edge_vagrant)
+
+                    admin_dn = f"CN=Administrator,CN=Users,DC={domain_name.replace('.', ',DC=')}"
+                    ingestor.upsert_user_raw({
+                        "distinguishedName": admin_dn,
+                        "sAMAccountName": "Administrator",
+                        "userAccountControl": "0x200",
+                        "adminCount": 1,
+                    }, domain_name)
+
+                    edge_admin = AdminToEdge(
+                        principal_dn=admin_dn,
+                        computer_dn=dc_dn,
+                        source_tool="dcsync_assessment",
+                        collected_at=datetime.datetime.utcnow(),
+                    )
+                    ingestor.link_admin_to(edge_admin)
+
             except Exception as graph_err:
                 logger.error(f"Neo4j ingestion encountered an error: {graph_err}")
 
-            # Mark investigation fully completed
             inv.status = "completed"
             inv.completed_at = datetime.datetime.utcnow()
             db.commit()

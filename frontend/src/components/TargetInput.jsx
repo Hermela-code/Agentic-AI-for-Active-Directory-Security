@@ -48,7 +48,7 @@ export default function TargetInput({ onStart, disabled }) {
           onChange={(e) => setScope(e.target.value)}
           disabled={disabled}
         />
-        <small className="helper-text">Defines the hard boundary the agent cannot scan outside of.</small>
+        
       </div>
 
       <label htmlFor="metadata">Investigation Metadata (optional)</label>

@@ -70,3 +70,18 @@ class InvestigationState(BaseModel):
     findings: List[Finding] = []
     decision_log: List[str] = []
     approval_records: List[ApprovalRequest] = []
+class DiscoveredCredential(BaseModel):
+    username: str
+    domain: Optional[str] = None
+    secret: str
+    secret_type: str  # "plaintext", "ntlm_hash", "encrypted_string"
+    source: str       # "sysvol_script", "default_check", "secretsdump"
+    is_valid: Optional[bool] = None
+    is_admin: bool = False
+class AttackGraphEdge(BaseModel):
+    source_label: str
+    source_id: str
+    relation: str    # "MEMBER_OF", "READS_SHARE", "ADMIN_TO", "HAS_CREDENTIALS"
+    target_label: str
+    target_id: str
+    properties: dict = {}

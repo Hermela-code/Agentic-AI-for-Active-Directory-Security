@@ -92,10 +92,6 @@ class OllamaReasoningEngine:
             return decision
 
         except (urllib.error.URLError, json.JSONDecodeError, Exception) as e:
-            # Resilient fallback: report failure rather than crashing
-            return AgentDecision(
-                capability=None,
-                params={},
-                rationale=f"LLM reasoning error or connection failure: {str(e)}",
-                investigation_complete=True,
-            )
+            # Propagate LLM connection/processing errors so the worker can mark the investigation as failed.
+            # Raising preserves the original exception context for debugging.
+            raise e
